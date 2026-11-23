@@ -21,7 +21,7 @@ h1{font-size:1.2rem;margin:4px 0 12px}
 form{display:grid;gap:8px}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .row.solo{grid-template-columns:1fr}
-input,button{font:inherit;padding:11px;border-radius:10px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);width:100%}
+input,select,button{font:inherit;padding:11px;border-radius:10px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);width:100%}
 button.p{background:var(--ac);color:#fff;border:0;font-weight:600}
 .seg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .seg label{border:1px solid var(--bd);border-radius:10px;padding:10px;text-align:center}
@@ -40,13 +40,12 @@ button.p{background:var(--ac);color:#fff;border:0;font-weight:600}
 </style></head><body>
 <h1>Catatan Driver ShopeeFood</h1>
 
+
 <div class="card">
   <input type="month" id="bulan">
   <div class="sum">
     <div>Pemasukan<b class="in" id="sIn">Rp 0</b></div>
     <div>Pengeluaran<b class="out" id="sOut">Rp 0</b></div>
-    <div>Total order<b id="sOrd">0</b></div>
-    <div>Rata-rata per order<b id="sAvg">Rp 0</b></div>
     <div class="bersih">Bersih bulan ini<b id="sBersih">Rp 0</b></div>
   </div>
   <div class="hari" id="hari"></div>
@@ -60,11 +59,9 @@ button.p{background:var(--ac);color:#fff;border:0;font-weight:600}
     </div>
     <input id="jumlah" type="number" inputmode="numeric" min="1" placeholder="Jumlah (Rp)" required>
     <div class="row" id="row">
-      <input id="kategori" list="kat" placeholder="Kategori" required>
+      <select id="kategori" required></select>
       <input id="tanggal" type="date" required>
     </div>
-    <datalist id="kat"></datalist>
-    <input id="order" type="number" inputmode="numeric" min="0" placeholder="Jumlah order hari ini (opsional)">
     <input id="catatan" placeholder="Catatan (opsional)">
     <button class="p" type="submit">Simpan</button>
   </form>
@@ -79,6 +76,7 @@ button.p{background:var(--ac);color:#fff;border:0;font-weight:600}
   <button id="reset" class="danger">Reset semua data</button>
 </div>
 
+  
 <script>
 const KEY="keuangan_v1";
 const KAT={
@@ -96,20 +94,16 @@ const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){aler
 
 function setKategori(){
   const j=jenis();
-  $("#kat").replaceChildren(...KAT[j].map(k=>{const o=document.createElement("option");o.value=k;return o}));
-  $("#kategori").value=KAT[j][0];
-  $("#kategori").style.display=j==="masuk"?"none":"";
+  const sel=$("#kategori");
+  sel.replaceChildren(...KAT[j].map(k=>{const o=document.createElement("option");o.value=k;o.textContent=k;return o}));
+  sel.style.display=j==="masuk"?"none":"";
   $("#row").classList.toggle("solo",j==="masuk");
-  $("#order").style.display=j==="masuk"?"":"none";
 }
 
 function sumOf(rows){
-  let i=0,o=0,ord=0,inOrd=0;
-  rows.forEach(t=>{
-    if(t.jenis==="masuk"){i+=t.jumlah;if(t.order>0){ord+=t.order;inOrd+=t.jumlah}}
-    else o+=t.jumlah;
-  });
-  return {i,o,ord,inOrd};
+  let i=0,o=0;
+  rows.forEach(t=>{if(t.jenis==="masuk")i+=t.jumlah;else o+=t.jumlah});
+  return {i,o};
 }
 
 function render(){
@@ -119,12 +113,10 @@ function render(){
   const s=sumOf(rows);
   $("#sIn").textContent=rp(s.i);
   $("#sOut").textContent=rp(s.o);
-  $("#sOrd").textContent=s.ord;
-  $("#sAvg").textContent=rp(s.ord?Math.round(s.inOrd/s.ord):0);
   const b=$("#sBersih");b.textContent=rp(s.i-s.o);b.className=s.i-s.o<0?"out":"in";
 
   const h=sumOf(data.filter(t=>t.tanggal===today()));
-  $("#hari").textContent="Hari ini: pemasukan "+rp(h.i)+", "+h.ord+" order, bersih "+rp(h.i-h.o);
+  $("#hari").textContent="Hari ini: pemasukan "+rp(h.i)+", pengeluaran "+rp(h.o)+", bersih "+rp(h.i-h.o);
 
   const box=$("#list");box.replaceChildren();
   if(!rows.length){const e=document.createElement("div");e.className="empty";e.textContent="Belum ada transaksi.";box.append(e);return}
@@ -145,11 +137,8 @@ function render(){
       const left=document.createElement("div");
       const k=document.createElement("b");k.textContent=t.kategori;
       const sm=document.createElement("small");
-      const info=[];
-      if(t.order>0)info.push(t.order+" order");
-      if(t.catatan)info.push(t.catatan);
-      sm.textContent=info.join(" · ");
-      left.append(k);if(info.length)left.append(sm);
+      sm.textContent=t.catatan||"";
+      left.append(k);if(t.catatan)left.append(sm);
       const right=document.createElement("div");right.className="amt";
       const a=document.createElement("span");a.className=t.jenis==="masuk"?"in":"out";
       a.textContent=(t.jenis==="masuk"?"+":"-")+rp(t.jumlah);
@@ -175,11 +164,9 @@ $("#f").addEventListener("submit",e=>{
     catatan:$("#catatan").value.trim(),
     dibuat:Date.now()
   };
-  const ord=parseInt($("#order").value,10);
-  if(j==="masuk"&&ord>0)tx.order=ord;
   data.push(tx);
   save();
-  $("#jumlah").value="";$("#catatan").value="";$("#order").value="";
+  $("#jumlah").value="";$("#catatan").value="";
   render();
 });
 
